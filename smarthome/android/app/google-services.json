@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "776433831510",
+    "firebase_url": "https://smart-dc20a-default-rtdb.firebaseio.com",
+    "project_id": "smart-dc20a",
+    "storage_bucket": "smart-dc20a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:776433831510:android:3b2a7188bb447c5e96f5f7",
+        "android_client_info": {
+          "package_name": "com.example.smarthome"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFoP--rXQEnQ1ib8HdpJZEBNAYKN8dy8E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:776433831510:android:8ea429b434b2c94396f5f7",
+        "android_client_info": {
+          "package_name": "com.mad1.smarthome"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFoP--rXQEnQ1ib8HdpJZEBNAYKN8dy8E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
