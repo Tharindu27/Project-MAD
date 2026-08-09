@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hardware Simulator</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 24px; background: #f4f7fb; }
+      h1 { color: #333; margin-bottom: 8px; }
+      .status { padding: 12px; background: #e3f2fd; border-left: 4px solid #1976d2; margin-bottom: 16px; border-radius: 4px; }
+      .status.error { background: #ffebee; border-left-color: #c62828; }
+      .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: all 0.2s; }
+      .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+      .card h3 { margin: 0 0 8px 0; color: #333; }
+      .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+      .status-badge.on { background: #c8e6c9; color: #1b5e20; }
+      .status-badge.off { background: #eeeeee; color: #424242; }
+      .status-badge.error { background: #ffccbc; color: #bf360c; }
+      button { padding: 8px 16px; background: #1976d2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; margin-top: 8px; }
+      button:hover { background: #1565c0; }
+      button:disabled { background: #ccc; cursor: not-allowed; }
+      #device-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+      .device-empty { grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: #999; }
+    </style>
+  </head>
+  <body>
+    <h1>🏠 Hardware Simulator</h1>
+    <p>Live mirror of Firestore devices — toggle here to sync with the Flutter app.</p>
+    
+    <div id="status" class="status">
+      <strong>Initializing Firebase...</strong>
+    </div>
+    
+    <div id="device-list"></div>
+
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js';
+      import { getFirestore, collection, onSnapshot, doc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
+
+      const firebaseConfig = {
+        apiKey: 'AIzaSyDaF6tO61ZXCJDtcW-UX7YJ-DNifVjCsCs',
+        authDomain: 'smart-dc20a.firebaseapp.com',
+        projectId: 'smart-dc20a',
+        storageBucket: 'smart-dc20a.firebasestorage.app',
+        messagingSenderId: '776433831510',
+        appId: '1:776433831510:web:0aad83ac3f30c97a96f5f7',
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      const list = document.getElementById('device-list');
+      const statusDiv = document.getElementById('status');
+      let deviceCount = 0;
+
+      statusDiv.innerHTML = '<strong>✓ Firebase connected.</strong> Listening to Firestore...';
+
+      onSnapshot(
+        collection(db, 'houses'),
+        (housesSnap) => {
+          if (housesSnap.empty) {
+            list.innerHTML = '<div class="device-empty">No houses found. Run the Flutter app first to seed data.</div>';
+            statusDiv.innerHTML = '<strong style="color:#999;">No data yet — open the Flutter app to create a demo house.</strong>';
+            statusDiv.className = 'status';
+            return;
+          }
+
+          list.innerHTML = '';
+          deviceCount = 0;
+          const unsubscribers = [];
+
+          housesSnap.docs.forEach((houseDoc) => {
+            const houseId = houseDoc.id;
+            const houseName = houseDoc.data().name || 'House';
+
+            const floorUnsub = onSnapshot(
+              collection(db, 'houses', houseId, 'floors'),
+              (floorsSnap) => {
+                if (floorsSnap.empty) return;
+
+                floorsSnap.docs.forEach((floorDoc) => {
+                  const floorId = floorDoc.id;
+                  const floorName = floorDoc.data().name || 'Floor';
+
+                  const deviceUnsub = onSnapshot(
+                    collection(db, 'houses', houseId, 'floors', floorId, 'devices'),
+                    (devicesSnap) => {
+                      const floorDevices = list.querySelectorAll(`[data-floor="${floorId}"]`);
+                      floorDevices.forEach((el) => el.remove());
+
+                      if (!devicesSnap.empty) {
+                        deviceCount += devicesSnap.size;
+                        statusDiv.innerHTML = `<strong>✓ ${deviceCount} devices live</strong> — Changes sync instantly`;
+                      }
+
+                      devicesSnap.docs.forEach((deviceDoc) => {
+                        const device = deviceDoc.data();
+                        const statusClass = device.status === 'ON' ? 'on' : device.status === 'ERROR' ? 'error' : 'off';
+                        const card = document.createElement('div');
+                        card.className = 'card';
+                        card.setAttribute('data-floor', floorId);
+                        card.innerHTML = `
+                          <strong style="color:#666; font-size:12px;">${floorName}</strong>
+                          <h3>${device.name}</h3>
+                          <div class="status-badge ${statusClass}">${device.status}</div>
+                          <p style="margin:8px 0; font-size:13px; color:#888;">
+                            Last: ${device.lastUpdatedBy || 'system'} 
+                          </p>
+                          <button>Toggle Device</button>
+                        `;
+                        const button = card.querySelector('button');
+                        button.onclick = async () => {
+                          button.disabled = true;
+                          try {
+                            await updateDoc(doc(db, 'houses', houseId, 'floors', floorId, 'devices', deviceDoc.id), {
+                              status: device.status === 'ON' ? 'OFF' : 'ON',
+                              lastUpdatedBy: 'simulator',
+                              lastUpdated: serverTimestamp(),
+                            });
+                          } catch (err) {
+                            console.error('Update failed:', err);
+                            statusDiv.className = 'status error';
+                            statusDiv.innerHTML = `<strong>⚠ Error:</strong> ${err.message}`;
+                          } finally {
+                            button.disabled = false;
+                          }
+                        };
+                        list.appendChild(card);
+                      });
+                    },
+                    (err) => {
+                      console.error('Devices listener error:', err);
+                      statusDiv.className = 'status error';
+                      statusDiv.innerHTML = `<strong>⚠ Error listening to devices:</strong> ${err.message}`;
+                    }
+                  );
+                  unsubscribers.push(deviceUnsub);
+                });
+              }
+            );
+            unsubscribers.push(floorUnsub);
+          });
+        },
+        (err) => {
+          console.error('Houses listener error:', err);
+          statusDiv.className = 'status error';
+          statusDiv.innerHTML = `<strong>⚠ Firebase error:</strong> ${err.message}`;
+          list.innerHTML = '<div class="device-empty">Error connecting to Firestore. Check console for details.</div>';
+        }
+      );
+    </script>
+  </body>
+</html>
